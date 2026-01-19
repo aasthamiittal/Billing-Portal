@@ -1,7 +1,14 @@
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
-  user: null,
+  user: (() => {
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })(),
   accessToken: localStorage.getItem("accessToken"),
   refreshToken: localStorage.getItem("refreshToken"),
 };
@@ -17,6 +24,7 @@ const authSlice = createSlice({
       state.refreshToken = refreshToken;
       if (accessToken) localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+      if (user) localStorage.setItem("user", JSON.stringify(user));
     },
     clearAuth(state) {
       state.user = null;
@@ -24,6 +32,7 @@ const authSlice = createSlice({
       state.refreshToken = null;
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
     },
   },
 });

@@ -3,7 +3,12 @@ const mongoose = require("mongoose");
 const itemSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    category: { type: String, default: "" },
+    // Store-scoped category (required for store-centric lifecycle)
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", index: true },
+    // Denormalized for faster listing/search (kept in sync on write)
+    categoryName: { type: String, default: "" },
+    taxId: { type: mongoose.Schema.Types.ObjectId, ref: "CatalogEntry", index: true },
+    taxName: { type: String, default: "" },
     description: { type: String, default: "" },
     industry: {
       type: mongoose.Schema.Types.ObjectId,
@@ -13,7 +18,7 @@ const itemSchema = new mongoose.Schema(
     },
     store: { type: mongoose.Schema.Types.ObjectId, ref: "Store", index: true },
     defaultPrice: { type: Number, default: 0 },
-    taxRate: { type: Number, default: 0 },
+    taxRate: { type: Number, default: 0 }, // derived from selected tax
     isActive: { type: Boolean, default: true },
     attributes: { type: mongoose.Schema.Types.Mixed, default: {} },
   },

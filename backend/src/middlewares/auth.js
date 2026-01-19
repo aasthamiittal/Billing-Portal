@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const env = require("../config/env");
 const User = require("../models/User");
+const Role = require("../models/Role");
 const { ApiError } = require("../utils/errors");
 
 const requireAuth = async (req, res, next) => {
@@ -14,11 +15,18 @@ const requireAuth = async (req, res, next) => {
   try {
     const payload = jwt.verify(token, env.jwtAccessSecret);
     const user = await User.findById(payload.sub)
-      .populate({ path: "role", populate: { path: "permissions" } })
+      .populate("accessibleStores")
       .exec();
 
     if (!user || user.status !== "ACTIVE") {
       return next(new ApiError(401, "Invalid user"));
+    }
+
+    // Load role permissions by r_id from token (simpler model), falling back to user.role.
+    const roleId = payload.r_id || user.role;
+    if (roleId) {
+      const role = await Role.findById(roleId).exec();
+      if (role) user.role = role;
     }
 
     req.user = user;

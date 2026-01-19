@@ -9,7 +9,7 @@ const {
 
 const login = async ({ email, password }) => {
   const user = await User.findOne({ email })
-    .populate({ path: "role", populate: { path: "permissions" } })
+    .populate("role")
     .exec();
   if (!user) {
     throw new ApiError(401, "Invalid credentials");
@@ -36,7 +36,7 @@ const refresh = async (token) => {
     throw new ApiError(401, "Invalid refresh token");
   }
   const user = await User.findById(rotation.userId)
-    .populate({ path: "role", populate: { path: "permissions" } })
+    .populate("role")
     .exec();
   if (!user) {
     throw new ApiError(401, "Invalid refresh token");

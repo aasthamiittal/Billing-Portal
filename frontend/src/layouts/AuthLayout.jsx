@@ -1,4 +1,4 @@
-import { Box, Paper } from "@mui/material";
+import { Box } from "@mui/material";
 
 const AuthLayout = ({ children }) => (
   <Box
@@ -7,13 +7,11 @@ const AuthLayout = ({ children }) => (
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      bgcolor: "background.default",
+      background: "linear-gradient(135deg, #2f9fd6 0%, #9bd9d3 100%)",
       p: 2,
     }}
   >
-    <Paper elevation={0} sx={{ p: 4, width: "100%", maxWidth: 420 }}>
-      {children}
-    </Paper>
+    {children}
   </Box>
 );
 

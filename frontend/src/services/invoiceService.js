@@ -5,6 +5,11 @@ export const fetchInvoices = async () => {
   return data;
 };
 
+export const createInvoice = async (payload) => {
+  const { data } = await api.post("/invoices", payload);
+  return data;
+};
+
 export const downloadInvoicePdf = (id) =>
   api.get(`/invoices/${id}/pdf`, { responseType: "blob" });
 

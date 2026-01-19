@@ -1,7 +1,6 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/auth");
-const { requirePermission } = require("../middlewares/permissions");
-const PERMISSIONS = require("../utils/permissions");
+const { checkPermission } = require("../middlewares/permissions");
 const reportController = require("../controllers/reportController");
 
 const router = express.Router();
@@ -9,14 +8,38 @@ const router = express.Router();
 router.get(
   "/sales/excel",
   requireAuth,
-  requirePermission(PERMISSIONS.REPORTS_VIEW),
+  checkPermission("reports", "sales_report", "download"),
   reportController.downloadSalesReportExcel
 );
 router.get(
   "/sales/pdf",
   requireAuth,
-  requirePermission(PERMISSIONS.REPORTS_VIEW),
+  checkPermission("reports", "sales_report", "download"),
   reportController.downloadSalesReportPdf
+);
+router.get(
+  "/tax/excel",
+  requireAuth,
+  checkPermission("reports", "tax_report", "download"),
+  reportController.downloadTaxReportExcel
+);
+router.get(
+  "/tax/pdf",
+  requireAuth,
+  checkPermission("reports", "tax_report", "download"),
+  reportController.downloadTaxReportPdf
+);
+router.get(
+  "/invoices/excel",
+  requireAuth,
+  checkPermission("reports", "invoice_report", "download"),
+  reportController.downloadInvoiceReportExcel
+);
+router.get(
+  "/invoices/pdf",
+  requireAuth,
+  checkPermission("reports", "invoice_report", "download"),
+  reportController.downloadInvoiceReportPdf
 );
 
 module.exports = router;

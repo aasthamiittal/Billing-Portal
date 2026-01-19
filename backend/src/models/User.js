@@ -9,6 +9,10 @@ const userSchema = new mongoose.Schema(
     role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
     store: { type: mongoose.Schema.Types.ObjectId, ref: "Store" },
     isMasterAdmin: { type: Boolean, default: false },
+    // Hierarchical access: parent admins can manage their store hierarchy.
+    isParentAdmin: { type: Boolean, default: false },
+    // Explicitly granted store access (similar to access_store_info concept).
+    accessibleStores: [{ type: mongoose.Schema.Types.ObjectId, ref: "Store", index: true }],
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE"],

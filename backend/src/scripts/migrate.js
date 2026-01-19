@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const env = require("../config/env");
 
-const Permission = require("../models/Permission");
 const Role = require("../models/Role");
 const Industry = require("../models/Industry");
 const Store = require("../models/Store");
@@ -13,15 +12,24 @@ const InvoiceItem = require("../models/InvoiceItem");
 const Report = require("../models/Report");
 const AuditLog = require("../models/AuditLog");
 const RefreshToken = require("../models/RefreshToken");
+const Category = require("../models/Category");
+const Supplier = require("../models/Supplier");
+const Buyer = require("../models/Buyer");
+const StockTransaction = require("../models/StockTransaction");
+const InventorySnapshot = require("../models/InventorySnapshot");
 
 const models = [
-  Permission,
   Role,
   Industry,
   Store,
   User,
   Item,
   SKU,
+  Category,
+  Supplier,
+  Buyer,
+  StockTransaction,
+  InventorySnapshot,
   Invoice,
   InvoiceItem,
   Report,

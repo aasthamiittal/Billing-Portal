@@ -1,30 +1,40 @@
 const mongoose = require("mongoose");
 const env = require("../config/env");
-const Permission = require("../models/Permission");
 const Role = require("../models/Role");
 const User = require("../models/User");
 const Industry = require("../models/Industry");
 const Store = require("../models/Store");
-const PERMISSIONS = require("../utils/permissions");
+const permissionSchema = require("../config/permissionSchema");
+
+const LEVELS = { show: 1, read_only: 2, download: 2, read_write: 3 };
+const pickMaxLevel = (levels = []) => {
+  const set = new Set(levels);
+  // highest to lowest
+  if (set.has("read_write")) return "read_write";
+  if (set.has("download")) return "download";
+  if (set.has("read_only")) return "read_only";
+  if (set.has("show")) return "show";
+  return "read_write";
+};
+
+const buildMasterPermissions = () => {
+  const perms = {};
+  Object.entries(permissionSchema.modules || {}).forEach(([moduleKey, defs]) => {
+    perms[moduleKey] = {};
+    (defs || []).forEach((d) => {
+      perms[moduleKey][d.action] = pickMaxLevel(d.levels || []);
+    });
+  });
+  // Master should be able to access master-only features too.
+  if (!perms.users) perms.users = {};
+  perms.users.permissions = "read_write";
+  return perms;
+};
 
 const run = async () => {
   await mongoose.connect(env.mongodbUri, {
     autoIndex: env.nodeEnv !== "production",
   });
-
-  const permissionKeys = Object.values(PERMISSIONS);
-  const existing = await Permission.find({ key: { $in: permissionKeys } }).exec();
-  const existingKeys = new Set(existing.map((perm) => perm.key));
-
-  const toCreate = permissionKeys
-    .filter((key) => !existingKeys.has(key))
-    .map((key) => ({ key, description: key, module: "core" }));
-
-  if (toCreate.length) {
-    await Permission.insertMany(toCreate);
-  }
-
-  const permissions = await Permission.find({ key: { $in: permissionKeys } }).exec();
 
   let industry = await Industry.findOne({ code: "RETAIL" }).exec();
   if (!industry) {
@@ -44,9 +54,14 @@ const run = async () => {
   if (!role) {
     role = await Role.create({
       name: "Master Admin",
+      description: "Root administrator with full access",
       scope: "GLOBAL",
-      permissions: permissions.map((perm) => perm._id),
+      permissions: buildMasterPermissions(),
+      isActive: true,
     });
+  } else if (!role.permissions || Object.keys(role.permissions).length === 0) {
+    role.permissions = buildMasterPermissions();
+    await role.save();
   }
 
   const adminEmail = "admin@example.com";

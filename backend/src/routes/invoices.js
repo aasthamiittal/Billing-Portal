@@ -1,7 +1,6 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/auth");
-const { requirePermission } = require("../middlewares/permissions");
-const PERMISSIONS = require("../utils/permissions");
+const { checkPermission } = require("../middlewares/permissions");
 const validate = require("../middlewares/validate");
 const { createInvoiceSchema } = require("../validators/invoiceValidators");
 const invoiceController = require("../controllers/invoiceController");
@@ -11,26 +10,33 @@ const router = express.Router();
 router.get(
   "/",
   requireAuth,
-  requirePermission(PERMISSIONS.INVOICES_READ),
+  checkPermission("store_management", "invoice_list", "read_only"),
   invoiceController.listInvoices
+);
+router.post(
+  "/draft",
+  requireAuth,
+  checkPermission("store_management", "save_draft", "read_write"),
+  validate(createInvoiceSchema),
+  invoiceController.createInvoiceDraftHandler
 );
 router.post(
   "/",
   requireAuth,
-  requirePermission(PERMISSIONS.INVOICES_CREATE),
+  checkPermission("store_management", "quick_bill", "read_write"),
   validate(createInvoiceSchema),
   invoiceController.createInvoiceHandler
 );
 router.get(
   "/:id/pdf",
   requireAuth,
-  requirePermission(PERMISSIONS.INVOICES_READ),
+  checkPermission("store_management", "invoice_download", "download"),
   invoiceController.downloadInvoicePdf
 );
 router.get(
   "/:id/excel",
   requireAuth,
-  requirePermission(PERMISSIONS.INVOICES_READ),
+  checkPermission("store_management", "invoice_download", "download"),
   invoiceController.downloadInvoiceExcel
 );
 

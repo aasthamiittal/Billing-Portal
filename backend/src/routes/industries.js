@@ -1,7 +1,6 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/auth");
-const { requirePermission } = require("../middlewares/permissions");
-const PERMISSIONS = require("../utils/permissions");
+const { requireMasterAdmin } = require("../middlewares/requireMasterAdmin");
 const validate = require("../middlewares/validate");
 const { createIndustrySchema } = require("../validators/industryValidators");
 const industryController = require("../controllers/industryController");
@@ -11,13 +10,13 @@ const router = express.Router();
 router.get(
   "/",
   requireAuth,
-  requirePermission(PERMISSIONS.INDUSTRIES_READ),
+  requireMasterAdmin,
   industryController.listIndustries
 );
 router.post(
   "/",
   requireAuth,
-  requirePermission(PERMISSIONS.INDUSTRIES_CREATE),
+  requireMasterAdmin,
   validate(createIndustrySchema),
   industryController.createIndustry
 );

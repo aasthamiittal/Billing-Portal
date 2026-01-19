@@ -50,6 +50,12 @@ api.interceptors.response.use(
       try {
         const state = store.getState();
         const refreshToken = state.auth.refreshToken;
+        if (typeof refreshToken !== "string" || !refreshToken) {
+          // No valid refresh token available -> cannot refresh
+          const tokenError = new Error("Missing refresh token");
+          tokenError.code = "NO_REFRESH_TOKEN";
+          throw tokenError;
+        }
         const { data } = await axios.post(
           `${api.defaults.baseURL}/auth/refresh`,
           { refreshToken }

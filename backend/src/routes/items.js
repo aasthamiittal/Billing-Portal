@@ -1,25 +1,37 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/auth");
-const { requirePermission } = require("../middlewares/permissions");
-const PERMISSIONS = require("../utils/permissions");
+const { checkPermission } = require("../middlewares/permissions");
 const validate = require("../middlewares/validate");
-const { createItemSchema } = require("../validators/itemValidators");
+const { createItemSchema, updateItemSchema } = require("../validators/itemValidators");
 const itemController = require("../controllers/itemController");
 
 const router = express.Router();
 
 router.get(
+  "/search",
+  requireAuth,
+  checkPermission("items", "item_master", "read_only"),
+  itemController.searchItems
+);
+router.get(
   "/",
   requireAuth,
-  requirePermission(PERMISSIONS.ITEMS_READ),
+  checkPermission("items", "item_master", "read_only"),
   itemController.listItems
 );
 router.post(
   "/",
   requireAuth,
-  requirePermission(PERMISSIONS.ITEMS_CREATE),
+  checkPermission("items", "item_master", "read_write"),
   validate(createItemSchema),
   itemController.createItem
+);
+router.put(
+  "/:id",
+  requireAuth,
+  checkPermission("items", "item_master", "read_write"),
+  validate(updateItemSchema),
+  itemController.updateItem
 );
 
 module.exports = router;

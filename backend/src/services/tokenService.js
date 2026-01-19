@@ -4,12 +4,25 @@ const env = require("../config/env");
 const RefreshToken = require("../models/RefreshToken");
 const { parseDurationMs } = require("../utils/time");
 
-const createAccessToken = (user) =>
-  jwt.sign(
-    { sub: user._id.toString(), role: user.role?.name, store: user.store },
+const createAccessToken = (user) => {
+  const roleId =
+    typeof user.role === "object" && user.role
+      ? user.role._id?.toString?.() || String(user.role)
+      : user.role
+      ? String(user.role)
+      : null;
+
+  return jwt.sign(
+    {
+      sub: user._id.toString(),
+      // Role id reference, similar to "r_id" in the simpler model.
+      r_id: roleId,
+      store: user.store ? String(user.store) : null,
+    },
     env.jwtAccessSecret,
     { expiresIn: env.jwtAccessExpiresIn }
   );
+};
 
 const createRefreshToken = async (user) => {
   const token = nanoid(64);

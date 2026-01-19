@@ -1,0 +1,22 @@
+import api from "./api";
+
+export const fetchCategories = async (storeId) => {
+  const { data } = await api.get("/categories", { params: storeId ? { storeId } : undefined });
+  return data;
+};
+
+export const createCategory = async (payload) => {
+  const { data } = await api.post("/categories", payload);
+  return data;
+};
+
+export const updateCategory = async (id, payload) => {
+  const { data } = await api.put(`/categories/${id}`, payload);
+  return data;
+};
+
+export const deleteCategory = async (id) => {
+  const { data } = await api.delete(`/categories/${id}`);
+  return data;
+};
+

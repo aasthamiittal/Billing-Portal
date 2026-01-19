@@ -12,11 +12,16 @@ const invoiceItemSchema = Joi.object({
 
 const createInvoiceSchema = Joi.object({
   storeId: Joi.string().required(),
-  industryId: Joi.string().required(),
+  industryId: Joi.string().optional(),
   customerName: Joi.string().allow("", null),
   customerEmail: Joi.string().allow("", null),
   currency: Joi.string().default("INR"),
   notes: Joi.string().allow("", null),
+  orderTypeId: Joi.string().allow("", null).optional(),
+  paymentTypeId: Joi.string().allow("", null).optional(),
+  discountId: Joi.string().allow("", null).optional(),
+  // Discount percent (0-100)
+  discountValue: Joi.number().min(0).max(100).optional(),
   items: Joi.array().items(invoiceItemSchema).min(1).required(),
 });
 

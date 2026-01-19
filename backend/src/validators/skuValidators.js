@@ -7,7 +7,6 @@ const createSkuSchema = Joi.object({
   price: Joi.number().min(0).default(0),
   taxRate: Joi.number().min(0).default(0),
   discount: Joi.number().min(0).default(0),
-  inventoryQty: Joi.number().min(0).default(0),
   attributes: Joi.object().default({}),
 });
 
