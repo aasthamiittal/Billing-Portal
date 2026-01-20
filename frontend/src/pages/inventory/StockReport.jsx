@@ -19,6 +19,7 @@ import Search from "../../components/Search";
 import TableWrapper from "../../components/TableWrapper";
 import Loader from "../../components/Loader";
 import EmptyState from "../../components/EmptyState";
+import DateRangePicker from "../../components/DateRangePicker";
 import { fetchStores } from "../../services/storeService";
 import { fetchStockReport } from "../../services/inventoryService";
 import api from "../../services/api";
@@ -31,8 +32,7 @@ const StockReport = () => {
   const [stores, setStores] = useState([]);
   const [storeId, setStoreId] = useState("");
   const [query, setQuery] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [range, setRange] = useState({ startDate: "", endDate: "" });
   const [data, setData] = useState({ rows: [] });
 
   useEffect(() => {
@@ -54,13 +54,13 @@ const StockReport = () => {
       if (!storeId) return;
       const res = await fetchStockReport({
         storeId,
-        from: from || undefined,
-        to: to || undefined,
+        from: range.startDate || undefined,
+        to: range.endDate || undefined,
       });
       setData(res || { rows: [] });
     };
     load();
-  }, [storeId, from, to]);
+  }, [storeId, range.startDate, range.endDate]);
 
   const filtered = useMemo(() => {
     const rows = data?.rows || [];
@@ -72,7 +72,7 @@ const StockReport = () => {
   const exportExcel = async () => {
     const response = await api.get("/inventory/stock-report/excel", {
       responseType: "blob",
-      params: { storeId, from: from || undefined, to: to || undefined },
+      params: { storeId, from: range.startDate || undefined, to: range.endDate || undefined },
     });
     downloadBlob(response.data, `stock-report-${storeId}.xlsx`);
   };
@@ -80,7 +80,7 @@ const StockReport = () => {
   const exportPdf = async () => {
     const response = await api.get("/inventory/stock-report/pdf", {
       responseType: "blob",
-      params: { storeId, from: from || undefined, to: to || undefined },
+      params: { storeId, from: range.startDate || undefined, to: range.endDate || undefined },
     });
     downloadBlob(response.data, `stock-report-${storeId}.pdf`);
   };
@@ -119,8 +119,11 @@ const StockReport = () => {
               </MenuItem>
             ))}
           </TextField>
-          <TextField label="From" type="date" InputLabelProps={{ shrink: true }} value={from} onChange={(e) => setFrom(e.target.value)} />
-          <TextField label="To" type="date" InputLabelProps={{ shrink: true }} value={to} onChange={(e) => setTo(e.target.value)} />
+          <DateRangePicker
+            startDate={range.startDate}
+            endDate={range.endDate}
+            onChange={setRange}
+          />
         </Filters>
       </Paper>
 

@@ -164,13 +164,33 @@ const buildInvoiceExcel = async (invoice, items) => {
   return Buffer.from(buffer);
 };
 
-const buildSalesReportExcel = async (rows, totals) => {
+const applyReportHeader = (sheet, { storeId, startDate, endDate, reportName }) => {
+  sheet.addRow(["Store ID", storeId || "ALL"]);
+  sheet.addRow([
+    "Dates",
+    `${startDate || "-"} - ${endDate || "-"}`,
+  ]);
+  sheet.addRow(["Report Name", reportName]);
+  sheet.addRow([]);
+};
+
+const styleHeaderRow = (row) => {
+  row.font = { bold: true };
+  row.alignment = { horizontal: "center" };
+};
+
+const buildSalesReportExcel = async (rows, totals, meta = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Sales Report");
 
-  sheet.addRow(["Sales Report"]);
-  sheet.addRow([]);
-  sheet.addRow(["Invoice #", "Store", "Total", "Issued At"]);
+  applyReportHeader(sheet, {
+    storeId: meta.storeId,
+    startDate: meta.startDate,
+    endDate: meta.endDate,
+    reportName: "Sales Summary",
+  });
+  const headerRow = sheet.addRow(["Invoice #", "Store", "Total", "Issued At"]);
+  styleHeaderRow(headerRow);
 
   rows.forEach((row) => {
     sheet.addRow([row.invoiceNumber, row.store, row.total, row.issuedAt]);
@@ -182,6 +202,7 @@ const buildSalesReportExcel = async (rows, totals) => {
   sheet.columns.forEach((column) => {
     column.width = 24;
   });
+  sheet.getColumn(3).numFmt = "0.00";
 
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };
@@ -205,13 +226,18 @@ const buildSalesReportPdf = (rows, totals) =>
     doc.end();
   });
 
-const buildTaxReportExcel = async (rows, totals) => {
+const buildTaxReportExcel = async (rows, totals, meta = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Tax Report");
 
-  sheet.addRow(["Tax Report"]);
-  sheet.addRow([]);
-  sheet.addRow(["Invoice #", "Store", "Tax", "Issued At"]);
+  applyReportHeader(sheet, {
+    storeId: meta.storeId,
+    startDate: meta.startDate,
+    endDate: meta.endDate,
+    reportName: "Tax Report",
+  });
+  const headerRow = sheet.addRow(["Invoice #", "Store", "Tax", "Issued At"]);
+  styleHeaderRow(headerRow);
 
   rows.forEach((row) => {
     sheet.addRow([row.invoiceNumber, row.store, row.tax, row.issuedAt]);
@@ -223,6 +249,7 @@ const buildTaxReportExcel = async (rows, totals) => {
   sheet.columns.forEach((column) => {
     column.width = 24;
   });
+  sheet.getColumn(3).numFmt = "0.00";
 
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };
@@ -244,13 +271,18 @@ const buildTaxReportPdf = (rows, totals) =>
     doc.end();
   });
 
-const buildInvoiceReportExcel = async (rows, totals) => {
+const buildInvoiceReportExcel = async (rows, totals, meta = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Invoice Report");
 
-  sheet.addRow(["Invoice Report"]);
-  sheet.addRow([]);
-  sheet.addRow(["Invoice #", "Store", "Status", "Total", "Tax", "Discount", "Issued At"]);
+  applyReportHeader(sheet, {
+    storeId: meta.storeId,
+    startDate: meta.startDate,
+    endDate: meta.endDate,
+    reportName: "Invoice Summary",
+  });
+  const headerRow = sheet.addRow(["Invoice #", "Store", "Status", "Total", "Tax", "Discount", "Issued At"]);
+  styleHeaderRow(headerRow);
 
   rows.forEach((row) => {
     sheet.addRow([row.invoiceNumber, row.store, row.status, row.total, row.tax, row.discount, row.issuedAt]);
@@ -262,6 +294,9 @@ const buildInvoiceReportExcel = async (rows, totals) => {
   sheet.columns.forEach((column) => {
     column.width = 22;
   });
+  sheet.getColumn(4).numFmt = "0.00";
+  sheet.getColumn(5).numFmt = "0.00";
+  sheet.getColumn(6).numFmt = "0.00";
 
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };
@@ -285,16 +320,18 @@ const buildInvoiceReportPdf = (rows, totals) =>
     doc.end();
   });
 
-const buildStockReportExcel = async ({ storeName = "", from = "", to = "", rows = [] } = {}) => {
+const buildStockReportExcel = async ({ storeId = "", storeName = "", from = "", to = "", rows = [] } = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Stock Report");
 
-  sheet.addRow(["Stock Report"]);
-  sheet.addRow(["Store", storeName || "-"]);
-  sheet.addRow(["From", from || "-"]);
-  sheet.addRow(["To", to || "-"]);
-  sheet.addRow([]);
-  sheet.addRow(["Item", "Opening", "Purchased", "Sold", "Wasted", "Closing"]);
+  applyReportHeader(sheet, {
+    storeId: storeId || storeName || "-",
+    startDate: from,
+    endDate: to,
+    reportName: "Stock Report",
+  });
+  const headerRow = sheet.addRow(["Item", "Opening", "Purchased", "Sold", "Wasted", "Closing"]);
+  styleHeaderRow(headerRow);
 
   rows.forEach((r) => {
     sheet.addRow([r.itemName, r.opening, r.purchased, r.sold, r.wasted, r.closing]);
@@ -303,6 +340,11 @@ const buildStockReportExcel = async ({ storeName = "", from = "", to = "", rows 
   sheet.columns.forEach((column) => {
     column.width = 18;
   });
+  sheet.getColumn(2).numFmt = "0.00";
+  sheet.getColumn(3).numFmt = "0.00";
+  sheet.getColumn(4).numFmt = "0.00";
+  sheet.getColumn(5).numFmt = "0.00";
+  sheet.getColumn(6).numFmt = "0.00";
 
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };

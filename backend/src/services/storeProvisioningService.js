@@ -66,12 +66,12 @@ const buildDefaultUsers = (store, defaultPassword) => {
   return [
     {
       name: "Store Admin",
-      email: `storeadmin+${code}@example.com`,
+      email: `storeadmin${code}@gmail.com`,
       password,
     },
     {
       name: "Cashier",
-      email: `cashier+${code}@example.com`,
+      email: `cashier${code}@gmail.com`,
       password,
     },
   ];

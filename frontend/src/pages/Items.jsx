@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   Typography,
+  Chip,
   Table,
   TableHead,
   TableRow,
@@ -15,6 +17,8 @@ import {
   TextField,
   MenuItem,
   Paper,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import TableWrapper from "../components/TableWrapper";
 import Loader from "../components/Loader";
@@ -27,6 +31,7 @@ import { fetchCategories } from "../services/categoryService";
 import { listCatalog } from "../services/catalogService";
 
 const Items = () => {
+  const user = useSelector((state) => state.auth.user);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [stores, setStores] = useState([]);
@@ -38,8 +43,8 @@ const Items = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [form, setForm] = useState({
     name: "",
-    categoryId: "",
-    taxId: "",
+    categoryIds: [],
+    taxIds: [],
     description: "",
     defaultPrice: "",
     storeId: "",
@@ -54,15 +59,20 @@ const Items = () => {
         ]);
         setItems(itemsData);
         setStores(storesData);
-        if (storesData.length === 1) {
-          setForm((prev) => ({ ...prev, storeId: storesData[0]._id }));
+        const defaultStore = user?.isMasterAdmin
+          ? storesData.length === 1
+            ? storesData[0]._id
+            : ""
+          : user?.store || storesData[0]?._id || "";
+        if (defaultStore) {
+          setForm((prev) => ({ ...prev, storeId: defaultStore }));
         }
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [user?.isMasterAdmin, user?.store]);
 
   useEffect(() => {
     const load = async () => {
@@ -73,31 +83,45 @@ const Items = () => {
       ]);
       setCategories(catData || []);
       setTaxes((taxData || []).filter((t) => t.isActive));
-      // Reset category if it doesn't belong to the new store
-      if (form.categoryId && !catData?.some((c) => String(c._id) === String(form.categoryId))) {
-        setForm((prev) => ({ ...prev, categoryId: "" }));
+      // Reset categories if they don't belong to the new store
+      if (form.categoryIds?.length) {
+        const validIds = new Set(catData?.map((c) => String(c._id)));
+        const nextCategoryIds = form.categoryIds.filter((id) => validIds.has(String(id)));
+        if (nextCategoryIds.length !== form.categoryIds.length) {
+          setForm((prev) => ({ ...prev, categoryIds: nextCategoryIds }));
+        }
       }
-      if (form.taxId && !taxData?.some((t) => String(t._id) === String(form.taxId))) {
-        setForm((prev) => ({ ...prev, taxId: "" }));
+      if (form.taxIds?.length) {
+        const validIds = new Set(taxData?.map((t) => String(t._id)));
+        const nextTaxIds = form.taxIds.filter((id) => validIds.has(String(id)));
+        if (nextTaxIds.length !== form.taxIds.length) {
+          setForm((prev) => ({ ...prev, taxIds: nextTaxIds }));
+        }
       }
     };
     load();
-  }, [form.storeId, form.categoryId, form.taxId]);
+  }, [form.storeId, form.categoryIds, form.taxIds]);
 
   const filteredItems = useMemo(() => {
     if (!query) return items;
     const lower = query.toLowerCase();
-    return items.filter((item) => item.name.toLowerCase().includes(lower));
+    const filtered = items.filter((item) => item.name.toLowerCase().includes(lower));
+    if (!form.storeId) return filtered;
+    return filtered.filter((item) => String(item.store) === String(form.storeId));
   }, [items, query]);
 
   const resetForm = () => {
     setForm({
       name: "",
-      categoryId: "",
-      taxId: "",
+      categoryIds: [],
+      taxIds: [],
       description: "",
       defaultPrice: "",
-      storeId: stores.length === 1 ? stores[0]._id : "",
+      storeId: user?.isMasterAdmin
+        ? stores.length === 1
+          ? stores[0]._id
+          : ""
+        : user?.store || stores[0]?._id || "",
     });
   };
 
@@ -111,8 +135,8 @@ const Items = () => {
     setEditingItem(item);
     setForm({
       name: item.name || "",
-      categoryId: item.categoryId || "",
-      taxId: item.taxId || "",
+      categoryIds: item.categoryIds?.length ? item.categoryIds : item.categoryId ? [item.categoryId] : [],
+      taxIds: item.taxIds?.length ? item.taxIds : item.taxId ? [item.taxId] : [],
       description: item.description || "",
       defaultPrice: item.defaultPrice ?? "",
       storeId: item.store || "",
@@ -124,8 +148,8 @@ const Items = () => {
     const selectedStore = stores.find((store) => store._id === form.storeId);
     const payload = {
       name: form.name,
-      categoryId: form.categoryId,
-      taxId: form.taxId,
+      categoryIds: form.categoryIds,
+      taxIds: form.taxIds,
       description: form.description,
       defaultPrice: Number(form.defaultPrice || 0),
       storeId: form.storeId || undefined,
@@ -171,6 +195,7 @@ const Items = () => {
               setForm((prev) => ({ ...prev, storeId: event.target.value }))
             }
             fullWidth
+            disabled={!user?.isMasterAdmin}
           >
             {stores.map((store) => (
               <MenuItem key={store._id} value={store._id}>
@@ -192,6 +217,7 @@ const Items = () => {
                 <TableCell>Category</TableCell>
                 <TableCell>Price</TableCell>
                 <TableCell>Tax</TableCell>
+                <TableCell>Stock</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -199,9 +225,18 @@ const Items = () => {
               {filteredItems.map((item) => (
                 <TableRow key={item._id}>
                   <TableCell>{item.name}</TableCell>
-                  <TableCell>{item.categoryName || "-"}</TableCell>
+                <TableCell>
+                  {item.categoryNames?.length ? item.categoryNames.join(", ") : item.categoryName || "-"}
+                </TableCell>
                   <TableCell>{item.defaultPrice}</TableCell>
-                  <TableCell>{item.taxName || "-"}</TableCell>
+                <TableCell>{item.taxNames?.length ? item.taxNames.join(", ") : "-"}</TableCell>
+                  <TableCell>
+                    {item.isOutOfStock ? (
+                      <Chip size="small" color="error" label="Out of stock" />
+                    ) : (
+                      Number(item.stockQty || 0).toFixed(2)
+                    )}
+                  </TableCell>
                   <TableCell align="right">
                     <Button size="small" onClick={() => openEdit(item)}>
                       Edit
@@ -228,33 +263,49 @@ const Items = () => {
             />
             <TextField
               select
-              label="Category"
-              value={form.categoryId}
+              label="Categories"
+              value={form.categoryIds}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, categoryId: event.target.value }))
+                setForm((prev) => ({ ...prev, categoryIds: event.target.value }))
               }
+              SelectProps={{
+                multiple: true,
+                renderValue: (selected) =>
+                  categories
+                    .filter((c) => selected.includes(c._id))
+                    .map((c) => c.name)
+                    .join(", "),
+              }}
               required
             >
-              <MenuItem value="">Select category</MenuItem>
               {categories.map((c) => (
                 <MenuItem key={c._id} value={c._id}>
-                  {c.name}
+                  <Checkbox checked={form.categoryIds.indexOf(c._id) > -1} />
+                  <ListItemText primary={c.name} />
                 </MenuItem>
               ))}
             </TextField>
             <TextField
               select
-              label="Tax"
-              value={form.taxId || ""}
+              label="Taxes"
+              value={form.taxIds}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, taxId: event.target.value }))
+                setForm((prev) => ({ ...prev, taxIds: event.target.value }))
               }
+              SelectProps={{
+                multiple: true,
+                renderValue: (selected) =>
+                  taxes
+                    .filter((t) => selected.includes(t._id))
+                    .map((t) => `${t.name} (${Number(t.value || 0).toFixed(2)}%)`)
+                    .join(", "),
+              }}
               required
             >
-              <MenuItem value="">Select tax</MenuItem>
               {taxes.map((t) => (
                 <MenuItem key={t._id} value={t._id}>
-                  {t.name} ({Number(t.value || 0).toFixed(2)}%)
+                  <Checkbox checked={form.taxIds.indexOf(t._id) > -1} />
+                  <ListItemText primary={`${t.name} (${Number(t.value || 0).toFixed(2)}%)`} />
                 </MenuItem>
               ))}
             </TextField>
@@ -297,7 +348,7 @@ const Items = () => {
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={saving || !form.name || !form.storeId || !form.categoryId}
+            disabled={saving || !form.name || !form.storeId || !form.categoryIds.length || !form.taxIds.length}
           >
             {saving ? "Saving..." : "Save"}
           </Button>

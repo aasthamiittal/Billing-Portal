@@ -2,10 +2,37 @@ const Item = require("../models/Item");
 const Category = require("../models/Category");
 const CatalogEntry = require("../models/CatalogEntry");
 const Industry = require("../models/Industry");
+const StockTransaction = require("../models/StockTransaction");
 const asyncHandler = require("../utils/asyncHandler");
 const Store = require("../models/Store");
 const { ApiError } = require("../utils/errors");
 const { getAccessibleStoreIds } = require("../utils/storeScope");
+
+const getStockMap = async (itemIds, storeIds = null) => {
+  if (!itemIds?.length) return new Map();
+  const match = { item: { $in: itemIds }, isActive: true };
+  if (storeIds?.length) {
+    match.store = { $in: storeIds };
+  }
+  const agg = await StockTransaction.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: "$item",
+        purchased: { $sum: { $cond: [{ $eq: ["$type", "PURCHASE"] }, "$quantity", 0] } },
+        sold: { $sum: { $cond: [{ $eq: ["$type", "SOLD"] }, "$quantity", 0] } },
+        wasted: { $sum: { $cond: [{ $eq: ["$type", "WASTAGE"] }, "$quantity", 0] } },
+      },
+    },
+  ]).exec();
+
+  const map = new Map();
+  agg.forEach((row) => {
+    const qty = (row.purchased || 0) - (row.sold || 0) - (row.wasted || 0);
+    map.set(String(row._id), qty);
+  });
+  return map;
+};
 
 const listItems = asyncHandler(async (req, res) => {
   const filter = {};
@@ -13,14 +40,21 @@ const listItems = asyncHandler(async (req, res) => {
     const ids = await getAccessibleStoreIds(req.user);
     filter.store = { $in: ids || [] };
   }
-  const items = await Item.find(filter).exec();
-  res.json(items);
+  const items = await Item.find(filter).lean().exec();
+  const stockMap = await getStockMap(
+    items.map((i) => i._id),
+    [...new Set(items.map((i) => i.store).filter(Boolean))]
+  );
+  const enriched = items.map((item) => {
+    const stockQty = stockMap.get(String(item._id)) || 0;
+    return { ...item, stockQty, isOutOfStock: stockQty <= 0 };
+  });
+  res.json(enriched);
 });
 
 const createItem = asyncHandler(async (req, res) => {
   const { industryId, storeId, ...rest } = req.body;
-  const { categoryId } = req.body;
-  const { taxId } = req.body;
+  const { categoryId, categoryIds, taxIds } = req.body;
   const industry = await Industry.findById(industryId).exec();
   if (!industry) {
     throw new ApiError(400, "Invalid industry");
@@ -39,25 +73,40 @@ const createItem = asyncHandler(async (req, res) => {
     if (!store) throw new ApiError(400, "Invalid store");
   }
 
-  const category = await Category.findById(categoryId).exec();
-  if (!category) throw new ApiError(400, "Invalid category");
-  if (String(category.store) !== String(resolvedStoreId)) {
+  const selectedCategoryIds = (categoryIds && categoryIds.length ? categoryIds : categoryId ? [categoryId] : [])
+    .filter(Boolean);
+  if (!selectedCategoryIds.length) throw new ApiError(400, "Category is required");
+  const categories = await Category.find({ _id: { $in: selectedCategoryIds } }).exec();
+  if (!categories.length || categories.length !== selectedCategoryIds.length) {
+    throw new ApiError(400, "Invalid category");
+  }
+  if (categories.some((c) => String(c.store) !== String(resolvedStoreId))) {
     throw new ApiError(400, "Category does not belong to store");
   }
+  const categoryNames = categories.map((c) => c.name);
+  const primaryCategory = categories[0];
 
-  const tax = await CatalogEntry.findById(taxId).exec();
-  if (!tax || tax.kind !== "taxes") throw new ApiError(400, "Invalid tax");
-  if (String(tax.store) !== String(resolvedStoreId)) {
+  const taxes = await CatalogEntry.find({ _id: { $in: taxIds || [] } }).exec();
+  if (!taxes.length || taxes.some((t) => t.kind !== "taxes")) {
+    throw new ApiError(400, "Invalid tax");
+  }
+  if (taxes.some((t) => String(t.store) !== String(resolvedStoreId))) {
     throw new ApiError(400, "Tax does not belong to store");
   }
+  const taxNames = taxes.map((t) => t.name);
+  const taxRates = taxes.map((t) => Number(t.value || 0));
+  const taxRate = taxRates.reduce((sum, val) => sum + val, 0);
 
   const item = await Item.create({
     ...rest,
-    categoryId: category._id,
-    categoryName: category.name,
-    taxId: tax._id,
-    taxName: tax.name,
-    taxRate: Number(tax.value || 0),
+    categoryId: primaryCategory._id,
+    categoryIds: categories.map((c) => c._id),
+    categoryName: primaryCategory.name,
+    categoryNames,
+    taxIds: taxes.map((t) => t._id),
+    taxNames,
+    taxRates,
+    taxRate,
     industry: industry._id,
     store: resolvedStoreId,
   });
@@ -96,25 +145,39 @@ const updateItem = asyncHandler(async (req, res) => {
     item.store = storeId;
   }
 
-  if (req.body.categoryId) {
-    const category = await Category.findById(req.body.categoryId).exec();
-    if (!category) throw new ApiError(400, "Invalid category");
-    if (String(category.store) !== String(item.store)) {
+  if (req.body.categoryId || req.body.categoryIds) {
+    const selectedCategoryIds = (req.body.categoryIds && req.body.categoryIds.length
+      ? req.body.categoryIds
+      : req.body.categoryId
+        ? [req.body.categoryId]
+        : []).filter(Boolean);
+    if (!selectedCategoryIds.length) throw new ApiError(400, "Category is required");
+    const categories = await Category.find({ _id: { $in: selectedCategoryIds } }).exec();
+    if (!categories.length || categories.length !== selectedCategoryIds.length) {
+      throw new ApiError(400, "Invalid category");
+    }
+    if (categories.some((c) => String(c.store) !== String(item.store))) {
       throw new ApiError(400, "Category does not belong to store");
     }
-    item.categoryId = category._id;
-    item.categoryName = category.name;
+    const primaryCategory = categories[0];
+    item.categoryId = primaryCategory._id;
+    item.categoryIds = categories.map((c) => c._id);
+    item.categoryName = primaryCategory.name;
+    item.categoryNames = categories.map((c) => c.name);
   }
 
-  if (req.body.taxId) {
-    const tax = await CatalogEntry.findById(req.body.taxId).exec();
-    if (!tax || tax.kind !== "taxes") throw new ApiError(400, "Invalid tax");
-    if (String(tax.store) !== String(item.store)) {
+  if (req.body.taxIds) {
+    const taxes = await CatalogEntry.find({ _id: { $in: req.body.taxIds || [] } }).exec();
+    if (!taxes.length || taxes.some((t) => t.kind !== "taxes")) {
+      throw new ApiError(400, "Invalid tax");
+    }
+    if (taxes.some((t) => String(t.store) !== String(item.store))) {
       throw new ApiError(400, "Tax does not belong to store");
     }
-    item.taxId = tax._id;
-    item.taxName = tax.name;
-    item.taxRate = Number(tax.value || 0);
+    item.taxIds = taxes.map((t) => t._id);
+    item.taxNames = taxes.map((t) => t.name);
+    item.taxRates = taxes.map((t) => Number(t.value || 0));
+    item.taxRate = item.taxRates.reduce((sum, val) => sum + val, 0);
   }
 
   Object.assign(item, rest);
@@ -137,12 +200,22 @@ const searchItems = asyncHandler(async (req, res) => {
     filter.$or = [
       { name: { $regex: q, $options: "i" } },
       { categoryName: { $regex: q, $options: "i" } },
+      { categoryNames: { $regex: q, $options: "i" } },
       { description: { $regex: q, $options: "i" } },
     ];
   }
 
   const items = await Item.find(filter).sort({ name: 1 }).limit(limit).exec();
-  res.json(items);
+  const lean = items.map((i) => i.toObject());
+  const stockMap = await getStockMap(
+    lean.map((i) => i._id),
+    [...new Set(lean.map((i) => i.store).filter(Boolean))]
+  );
+  const enriched = lean.map((item) => {
+    const stockQty = stockMap.get(String(item._id)) || 0;
+    return { ...item, stockQty, isOutOfStock: stockQty <= 0 };
+  });
+  res.json(enriched);
 });
 
 module.exports = { listItems, searchItems, createItem, updateItem };

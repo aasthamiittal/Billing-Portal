@@ -39,6 +39,7 @@ const QuickBilling = () => {
   const [items, setItems] = useState([]);
   const [stores, setStores] = useState([]);
   const [storeId, setStoreId] = useState("");
+  const [storeLabel, setStoreLabel] = useState("");
 
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState([]);
@@ -75,13 +76,15 @@ const QuickBilling = () => {
         const [itemData, storeData] = await Promise.all([fetchItems(), fetchStores()]);
         setItems(itemData);
         setStores(storeData);
-        if (storeData.length === 1) setStoreId(storeData[0]._id);
+        const resolvedStore = user?.store || storeData?.[0]?._id || "";
+        setStoreId(resolvedStore);
+        setStoreLabel(storeData.find((s) => String(s._id) === String(resolvedStore))?.name || "");
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [user?.store]);
 
   useEffect(() => {
     const load = async () => {
@@ -91,13 +94,16 @@ const QuickBilling = () => {
         listCatalog("payment-types", { storeId }),
         listCatalog("discounts", { storeId }),
       ]);
-      setOrderTypes((orders || []).filter((o) => o.isActive));
-      setPaymentTypes((payments || []).filter((p) => p.isActive));
-      setDiscounts((disc || []).filter((d) => d.isActive));
+      const orderRows = (orders || []).filter((o) => o.isActive);
+      const paymentRows = (payments || []).filter((p) => p.isActive);
+      const discountRows = (disc || []).filter((d) => d.isActive);
+      setOrderTypes(orderRows);
+      setPaymentTypes(paymentRows);
+      setDiscounts(discountRows);
       // Reset selections if they don't belong to store
-      if (orderTypeId && !orders?.some((o) => String(o._id) === String(orderTypeId))) setOrderTypeId("");
-      if (paymentTypeId && !payments?.some((p) => String(p._id) === String(paymentTypeId))) setPaymentTypeId("");
-      if (discountId && !disc?.some((d) => String(d._id) === String(discountId))) {
+      if (orderTypeId && !orderRows?.some((o) => String(o._id) === String(orderTypeId))) setOrderTypeId("");
+      if (paymentTypeId && !paymentRows?.some((p) => String(p._id) === String(paymentTypeId))) setPaymentTypeId("");
+      if (discountId && !discountRows?.some((d) => String(d._id) === String(discountId))) {
         setDiscountId("");
         setDiscountValue(0);
       }
@@ -108,17 +114,21 @@ const QuickBilling = () => {
   const filteredItems = useMemo(() => {
     if (!query) return items.slice(0, 20);
     const lower = query.toLowerCase();
-    return items
+    const storeFiltered = items.filter((i) => !storeId || String(i.store) === String(storeId));
+    return storeFiltered
       .filter(
         (i) =>
           i.name?.toLowerCase().includes(lower) ||
-          (i.categoryName || "").toLowerCase().includes(lower) ||
+          ((i.categoryNames?.length ? i.categoryNames.join(" ") : i.categoryName || "") || "")
+            .toLowerCase()
+            .includes(lower) ||
           i.description?.toLowerCase().includes(lower)
       )
       .slice(0, 50);
-  }, [items, query]);
+  }, [items, query, storeId]);
 
   const addToCart = (item) => {
+    if (item.isOutOfStock || Number(item.stockQty || 0) <= 0) return;
     setCart((prev) => {
       const existing = prev.find((c) => c.itemId === item._id);
       if (existing) {
@@ -132,6 +142,7 @@ const QuickBilling = () => {
           quantity: 1,
           unitPrice: Number(item.defaultPrice || 0),
           taxRate: Number(item.taxRate || 0),
+          taxNames: item.taxNames?.length ? item.taxNames : item.taxName ? [item.taxName] : [],
         },
       ];
     });
@@ -161,6 +172,7 @@ const QuickBilling = () => {
 
   const handleSaveDraft = async () => {
     if (!canDraft) return;
+    if (!orderTypeId || !paymentTypeId || !discountId) return;
     setSavingDraft(true);
     try {
       const selectedStore = stores.find((s) => s._id === storeId);
@@ -194,6 +206,7 @@ const QuickBilling = () => {
 
   const handleGenerate = async () => {
     if (!canCreate) return;
+    if (!orderTypeId || !paymentTypeId || !discountId) return;
     setGenerating(true);
     try {
       const selectedStore = stores.find((s) => s._id === storeId);
@@ -254,7 +267,7 @@ const QuickBilling = () => {
                 variant="outlined"
                 startIcon={<SaveOutlinedIcon />}
                 onClick={handleSaveDraft}
-                disabled={!canDraft || savingDraft || cart.length === 0 || !storeId}
+                disabled={!canDraft || savingDraft || cart.length === 0 || !storeId || !orderTypeId || !paymentTypeId || !discountId}
               >
                 {savingDraft ? "Saving..." : "Save as Draft"}
               </Button>
@@ -266,7 +279,7 @@ const QuickBilling = () => {
                 variant="contained"
                 sx={{ bgcolor: "#39A1F7" }}
                 onClick={handleGenerate}
-                disabled={!canCreate || generating || cart.length === 0 || !storeId}
+                disabled={!canCreate || generating || cart.length === 0 || !storeId || !orderTypeId || !paymentTypeId || !discountId}
               >
                 {generating ? "Generating..." : "Generate Invoice"}
               </Button>
@@ -339,19 +352,11 @@ const QuickBilling = () => {
                   fullWidth
                 />
                 <TextField
-                  select
                   label="Store"
-                  value={storeId}
-                  onChange={(e) => setStoreId(e.target.value)}
+                  value={storeLabel || "-"}
                   sx={{ minWidth: 220 }}
-                  disabled={!user?.isMasterAdmin}
-                >
-                  {stores.map((s) => (
-                    <MenuItem key={s._id} value={s._id}>
-                      {s.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                  InputProps={{ readOnly: true }}
+                />
               </Stack>
 
               <Box>
@@ -362,16 +367,22 @@ const QuickBilling = () => {
                   <EmptyState title="No items" description="Add items to start billing." />
                 ) : (
                   <Stack direction="row" flexWrap="wrap" gap={1}>
-                    {filteredItems.map((i) => (
-                      <Chip
-                        key={i._id}
-                        label={`${i.name} • ₹${Number(i.defaultPrice || 0).toFixed(0)}`}
-                        variant="outlined"
-                        onClick={() => addToCart(i)}
-                        clickable
-                        sx={{ borderColor: "rgba(57, 161, 247, 0.45)" }}
-                      />
-                    ))}
+                    {filteredItems.map((i) => {
+                      const outOfStock = i.isOutOfStock || Number(i.stockQty || 0) <= 0;
+                      return (
+                        <Chip
+                          key={i._id}
+                          label={`${i.name} • ₹${Number(i.defaultPrice || 0).toFixed(0)}${outOfStock ? " • Out of stock" : ""}`}
+                          variant="outlined"
+                          onClick={() => addToCart(i)}
+                          clickable={!outOfStock}
+                          disabled={outOfStock}
+                          color={outOfStock ? "error" : "default"}
+                          size="small"
+                          sx={{ borderColor: outOfStock ? "rgba(239, 68, 68, 0.6)" : "rgba(57, 161, 247, 0.45)" }}
+                        />
+                      );
+                    })}
                   </Stack>
                 )}
               </Box>
@@ -394,7 +405,7 @@ const QuickBilling = () => {
                               {c.name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              Tax: {c.taxRate}%
+                              Taxes: {c.taxNames?.length ? c.taxNames.join(", ") : "-"} • {c.taxRate}%
                             </Typography>
                           </Grid>
                           <Grid item xs={6} md={2}>
@@ -486,8 +497,9 @@ const QuickBilling = () => {
                 label="Order Type"
                 value={orderTypeId}
                 onChange={(e) => setOrderTypeId(e.target.value)}
+                required
               >
-                <MenuItem value="">Select order type</MenuItem>
+                <MenuItem value="">Select Order Type</MenuItem>
                 {orderTypes.map((o) => (
                   <MenuItem key={o._id} value={o._id}>
                     {o.name}
@@ -503,21 +515,21 @@ const QuickBilling = () => {
                 <MenuItem value="PENDING">Unpaid / Pending</MenuItem>
                 <MenuItem value="PAID">Paid</MenuItem>
               </TextField>
-              <TextField select label="Payment Type" value={paymentTypeId} onChange={(e) => setPaymentTypeId(e.target.value)}>
-                <MenuItem value="">Select payment type</MenuItem>
+              <TextField select label="Payment Type" value={paymentTypeId} onChange={(e) => setPaymentTypeId(e.target.value)} required>
+                <MenuItem value="">Select Payment Type</MenuItem>
                 {paymentTypes.map((p) => (
                   <MenuItem key={p._id} value={p._id}>
                     {p.name}
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField select label="Discount" value={discountId} onChange={(e) => {
+              <TextField select label="Discount (%)" value={discountId} onChange={(e) => {
                 const nextId = e.target.value;
                 setDiscountId(nextId);
                 const entry = discounts.find((d) => String(d._id) === String(nextId));
                 setDiscountValue(Number(entry?.value || 0));
-              }}>
-                <MenuItem value="">No discount</MenuItem>
+              }} required>
+                <MenuItem value="">Select Discount</MenuItem>
                 {discounts.map((d) => (
                   <MenuItem key={d._id} value={d._id}>
                     {d.name} ({Number(d.value || 0).toFixed(2)}%)

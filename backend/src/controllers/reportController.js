@@ -41,12 +41,17 @@ const getSalesData = async (req) => {
     issuedAt: dayjs(invoice.issuedAt).format("YYYY-MM-DD"),
   }));
   const total = rows.reduce((sum, row) => sum + row.total, 0);
-  return { rows, totals: { total } };
+  const meta = {
+    storeId: storeId || (!req.user.isMasterAdmin ? req.user.store : "ALL"),
+    startDate: startDate || "",
+    endDate: endDate || "",
+  };
+  return { rows, totals: { total }, meta };
 };
 
 const downloadSalesReportExcel = asyncHandler(async (req, res) => {
-  const { rows, totals } = await getSalesData(req);
-  const buffer = await buildSalesReportExcel(rows, totals);
+  const { rows, totals, meta } = await getSalesData(req);
+  const buffer = await buildSalesReportExcel(rows, totals, meta);
   res.setHeader(
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -67,6 +72,11 @@ const downloadSalesReportPdf = asyncHandler(async (req, res) => {
     "attachment; filename=sales-report.pdf"
   );
   res.send(buffer);
+});
+
+const listSalesReport = asyncHandler(async (req, res) => {
+  const { rows, totals } = await getSalesData(req);
+  res.json({ rows, totals });
 });
 
 const getTaxData = async (req) => {
@@ -98,12 +108,17 @@ const getTaxData = async (req) => {
   }));
 
   const tax = rows.reduce((sum, row) => sum + row.tax, 0);
-  return { rows, totals: { tax } };
+  const meta = {
+    storeId: storeId || (!req.user.isMasterAdmin ? req.user.store : "ALL"),
+    startDate: startDate || "",
+    endDate: endDate || "",
+  };
+  return { rows, totals: { tax }, meta };
 };
 
 const downloadTaxReportExcel = asyncHandler(async (req, res) => {
-  const { rows, totals } = await getTaxData(req);
-  const buffer = await buildTaxReportExcel(rows, totals);
+  const { rows, totals, meta } = await getTaxData(req);
+  const buffer = await buildTaxReportExcel(rows, totals, meta);
   res.setHeader(
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -118,6 +133,11 @@ const downloadTaxReportPdf = asyncHandler(async (req, res) => {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", "attachment; filename=tax-report.pdf");
   res.send(buffer);
+});
+
+const listTaxReport = asyncHandler(async (req, res) => {
+  const { rows, totals } = await getTaxData(req);
+  res.json({ rows, totals });
 });
 
 const getInvoiceReportData = async (req) => {
@@ -160,12 +180,17 @@ const getInvoiceReportData = async (req) => {
     { total: 0, tax: 0, discount: 0 }
   );
 
-  return { rows, totals };
+  const meta = {
+    storeId: storeId || (!req.user.isMasterAdmin ? req.user.store : "ALL"),
+    startDate: startDate || "",
+    endDate: endDate || "",
+  };
+  return { rows, totals, meta };
 };
 
 const downloadInvoiceReportExcel = asyncHandler(async (req, res) => {
-  const { rows, totals } = await getInvoiceReportData(req);
-  const buffer = await buildInvoiceReportExcel(rows, totals);
+  const { rows, totals, meta } = await getInvoiceReportData(req);
+  const buffer = await buildInvoiceReportExcel(rows, totals, meta);
   res.setHeader(
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -182,11 +207,19 @@ const downloadInvoiceReportPdf = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
+const listInvoiceReport = asyncHandler(async (req, res) => {
+  const { rows, totals } = await getInvoiceReportData(req);
+  res.json({ rows, totals });
+});
+
 module.exports = {
+  listSalesReport,
   downloadSalesReportExcel,
   downloadSalesReportPdf,
+  listTaxReport,
   downloadTaxReportExcel,
   downloadTaxReportPdf,
+  listInvoiceReport,
   downloadInvoiceReportExcel,
   downloadInvoiceReportPdf,
 };

@@ -29,7 +29,7 @@ export const menuConfig = [
         permissionKey: "quick_bill",
       },
       { label: "Invoices", path: "/invoices", permissionKey: "invoice_list" },
-      { label: "Payments", path: "/payments", permission: { category: "store_management", action: "payments", level: "read_only" }, optional: true },
+      // { label: "Payments", path: "/payments", permission: { category: "store_management", action: "payments", level: "read_only" }, optional: true },
     ],
   },
   {
@@ -61,7 +61,7 @@ export const menuConfig = [
         path: "/stores",
         permissionKey: "store_list",
       },
-      { label: "Store Configuration", path: "/store/configuration", permission: { category: "store_management", action: "store_config", level: "read_only" } },
+      // { label: "Store Configuration", path: "/store/configuration", permission: { category: "store_management", action: "store_config", level: "read_only" } },
       { label: "Taxes", path: "/store/taxes", permission: { category: "store_management", action: "tax_info", level: "read_only" } },
       { label: "Discounts", path: "/store/discounts", permission: { category: "store_management", action: "discount", level: "read_only" } },
       { label: "Order Types", path: "/store/order-types", permission: { category: "store_management", action: "order_type", level: "read_only" } },

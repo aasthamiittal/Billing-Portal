@@ -6,6 +6,12 @@ const reportController = require("../controllers/reportController");
 const router = express.Router();
 
 router.get(
+  "/sales",
+  requireAuth,
+  checkPermission("reports", "sales_report", "show"),
+  reportController.listSalesReport
+);
+router.get(
   "/sales/excel",
   requireAuth,
   checkPermission("reports", "sales_report", "download"),
@@ -18,6 +24,12 @@ router.get(
   reportController.downloadSalesReportPdf
 );
 router.get(
+  "/tax",
+  requireAuth,
+  checkPermission("reports", "tax_report", "show"),
+  reportController.listTaxReport
+);
+router.get(
   "/tax/excel",
   requireAuth,
   checkPermission("reports", "tax_report", "download"),
@@ -28,6 +40,12 @@ router.get(
   requireAuth,
   checkPermission("reports", "tax_report", "download"),
   reportController.downloadTaxReportPdf
+);
+router.get(
+  "/invoices",
+  requireAuth,
+  checkPermission("reports", "invoice_report", "show"),
+  reportController.listInvoiceReport
 );
 router.get(
   "/invoices/excel",

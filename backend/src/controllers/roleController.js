@@ -113,7 +113,8 @@ const listRoles = asyncHandler(async (req, res) => {
   const filter = {};
   if (!req.user.isMasterAdmin) {
     const ids = await getAccessibleStoreIds(req.user);
-    filter.$or = [{ scope: "GLOBAL" }, { store: { $in: ids || [] } }];
+    filter.scope = "STORE";
+    filter.store = { $in: ids || [] };
   }
   const roles = await Role.find(filter).exec();
   res.json((roles || []).map(sanitizeRoleOut));
