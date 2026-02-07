@@ -73,7 +73,7 @@ const run = async () => {
       admin.email = adminEmail;
       await admin.save();
     } else {
-      const passwordHash = await User.hashPassword("Admin@123");
+      const passwordHash = "Admin@123";
       admin = await User.create({
         name: "Master Admin",
         email: adminEmail,

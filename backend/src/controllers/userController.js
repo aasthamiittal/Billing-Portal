@@ -60,7 +60,7 @@ const createUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid store");
   }
 
-  const passwordHash = await User.hashPassword(password);
+  const passwordHash = password;
   const user = await User.create({
     name,
     email,
@@ -143,7 +143,7 @@ const updateUser = asyncHandler(async (req, res) => {
     user.store = store._id;
   }
   if (password) {
-    user.passwordHash = await User.hashPassword(password);
+    user.passwordHash = password;
   }
 
   await user.save();
